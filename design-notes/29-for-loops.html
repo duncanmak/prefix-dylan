@@ -1,0 +1,168 @@
+<A NAME="PREV" HREF=28-first-etc-are-functions.html>Previous chapter:  #28: First, Second, Third are Functions (Change)</A><P>
+<PRE>
+<H2>Dylan Design Notes</H2>
+
+<TITLE>Dylan Design Notes: #29: For Loops  (Change)</TITLE>
+<H1>#29: For Loops  (Change)</H1>
+
+Version 1, January 1994
+Copyright (c) 1993-1994, Apple Computer
+</PRE>
+This Design Note unifies Dylan's existing iteration constructs, for, 
+for-each, and dotimes, into one general for statement.  It also changes 
+the keywords in &lt;range&gt; to be compatible with the numeric clauses in the 
+new for statement.
+<HR>
+<h3>
+For statement
+</h3>
+Replace the<a href = "../book.annotated/ch8.html#for0"> for</a>, <a href = "../book.annotated/ch8.html#for-each0">for-each</a>, and <a href = "../book.annotated/ch8.html#dotimes0">dotimes</a> macros</a> with the following general 
+iteration construct:
+<P><PRE>
+for (clauses [{until | while} end-test])  [Special Form]
+        body-forms 
+        [finally result-forms] 
+end
+=&gt; values
+</PRE>
+for allows any number of clauses.  Each clause controls one iteration 
+variable throughout the iteration.  The optional end-test controls 
+whether the iteration continues or terminates.  It does not control any 
+iteration variables.
+<P>
+The kinds of clauses allowed in a for statement include the following:
+<P>
+Explicit step clauses provide the functionality of the old for statement.  
+The syntax for an explicit step clause is as follows:
+<PRE>
+{variable | variable :: type} = init-value then next-value
+</PRE>
+Collection clauses provide the functionality of the old for-each 
+statement.  The syntax for a collection clause is as follows:
+<PRE>
+{variable | variable :: type} in collection
+</PRE>
+Numeric clauses provide a convenient shorthand for iterating over 
+integers.  The syntax for a numeric clause is as follows:
+<PRE>
+{variable | variable :: type} from start 
+        [{to | above | below} bound]
+        [by increment]
+</PRE>
+Iteration with for proceeds through the following steps:
+<OL>
+<LI>    Evaluate the expressions that are evaluated just once, in left to 
+        right order as they appear in the for statement.
+<P>
+        For explicit step clauses, these expressions are type and 
+        init-value.  
+<P>
+        For collection clauses, these expressions  are type and 
+        collection.  If the value of collection is not a collection,
+        signal an error.
+<P>
+        For numeric clauses, these expressions are type, start, bound if 
+        it is supplied, and increment if it is supplied.  If increment
+        is not supplied, it defaults to 1, or -1 if it is an above clause.
+<P>
+<LI>    Bind the iteration variables of explicit step and numeric clauses.  
+<P>
+        For each explicit step clause, bind variable to the value of 
+        init-value.  If type is supplied and the value of init-value
+        is not of the specified type, signal an error.
+<P>
+        For each numeric clause, bind variable to the value of start.  If 
+        type is supplied and the value of start is not of the
+        specified type, signal an error.
+<P>
+<LI>    Check numeric and collection clauses for exhaustion.  If a clause is 
+        exhausted, go to step 9.
+<P>
+        A collection clause is exhausted if its collection has no next 
+        element.  (The first time through, the "next element" is the
+        first, if any.)
+<P>
+        Numeric clauses cannot be exhausted if bound is not supplied.  If 
+        bound is supplied, the following table gives the conditions
+        for exhaustion:
+<PRE>
+                   increment &gt;= 0        increment &lt; 0
+
+keyword =  to      variable &gt; bound      variable &lt; bound
+keyword =  above   variable &lt;= bound     variable &lt;= bound
+keyword =  below   variable &gt;= bound     variable &gt;= bound
+</PRE><P>
+<LI>    Bind the iteration variables of collection clauses.  Fresh bindings 
+        are created each time through the iteration.
+<P>
+        For each collection clause, bind variable to the next element of 
+        the collection for that clause.  If type is supplied and this
+        next element of the collection is not of the specified type,
+        signal an error.
+<P>
+<LI>    If end-test is supplied, evaluate it.  The termination conditions 
+        depend on the symbol used to introduce the end-test in the for
+        statement.
+<P>
+        If the value of end-test is false and the symbol is while, go to 
+        step 9.  
+<P>
+        If the value of end-test is true and the symbol is until, go to 
+        step 9.
+<P>
+<LI>    Execute the body-forms in sequence.
+<P>
+<LI>    Obtain the next values for explicit step and numeric clauses.
+        Values are obtained in left to right order, in the environment
+        produced by step 6.
+<P>
+        For each explicit step clause, evaluate next-value.
+<P>
+        For each numeric clause, add the values of variable and 
+        increment.
+<P>
+<LI>    Bind the iteration variables of explicit step and numeric
+        clauses to the values obtained in step 7.  For each clause, if
+        type is supplied and the next value for that clause is not of
+        the specified type, signal an error.  Fresh bindings are
+        created each time through the iteration.  After variables are
+        bound, go to step 3.
+<P>
+<LI>    Evaluate the result-forms in sequence.  Bindings created in step 2 
+        and 8 are visible during the execution of result-forms.
+        Bindings created in step 4 (i.e. the iteration variables of
+        collection clauses) are not visible during the execution of
+        result-forms.  The values of the last result-form are returned
+        by the for statement.  If there are no result-forms, #f is
+        returned.
+</OL>
+<h3>
+Range keyword arguments
+</h3>
+Remove the up-to and through keyword arguments in <a href = "../book.annotated/ch12.html#range0">range</a> and add three 
+arguments, to, above and below, which constrain the range.  to is an 
+inclusive bound, above is an exclusive lower bound and below is an 
+exclusive upper bound.  above and below constrain the range independent 
+of the sign of by.
+<HR>
+<h3>
+Notes
+</h3>
+Major changes between this specification and the Dylan book's iteration 
+constructs:
+<P>
+        Various kinds of iteration clauses (general iteration clauses, 
+numeric iteration clauses, and clauses for iterating over collections) 
+are allowed to appear in the same construct.
+<P>
+        Since clauses themselves can cause the iteration to terminate 
+(for example, when a collection is exhausted), the end test is moved into 
+the clauses and becomes an optional "termination clause."
+<P>
+        Optional result expressions are separated from the end test.  
+They now appear at the end of the construct rather than in the middle.
+<P>
+        Types may be declared for iteration variables.
+
+
+<P><A NAME="NEXT" HREF=30-make-range.html>Next chapter:  #30: Make Range (Change)</A>
